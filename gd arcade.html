@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GD ARCADE - XL EDITION</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+:root {
+  --gd-blue: #0066ff; --gd-dark: #000a1a;
+  --yellow:#FFE234; --green:#3DFF6A; --cyan:#00F0FF;
+  --comment-bg: #c27e4e; --comment-inner: #915a33;
+  --extreme-red: #ff4444; --gold: #FFD700;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    background: var(--gd-dark); color: #fff; font-family: 'Press Start 2P', monospace;
+    height: 100vh; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+#bg-layer { position: fixed; inset: 0; z-index: -1; background: linear-gradient(180deg, #002e5c 0%, #000 100%); }
+
+.screen { display: none; flex-direction: column; align-items: center; width: 100%; text-align: center; z-index: 10; }
+.active { display: flex; }
+.gd-logo { font-size: 32px; text-shadow: 4px 4px 0 #000; margin-bottom: 40px; }
+
+/* GD-ORDLE */
+#game-container {
+    width: 95%; max-width: 1100px; height: 45vh; overflow-y: auto;
+    margin-bottom: 20px; padding: 15px; display: flex; flex-direction: column; gap: 12px;
+    border: 4px solid rgba(255,255,255,0.1); border-radius: 10px; background: rgba(0,0,0,0.6);
+}
+.guess-row { display: flex; gap: 8px; justify-content: center; width: 100%; flex-shrink: 0; }
+.card {
+    width: 120px; height: 145px; border: 3px solid #fff; border-radius: 4px;
+    background: #000; transition: 0.6s; transform-style: preserve-3d; position: relative;
+}
+.card.reveal { transform: rotateY(180deg); }
+.card-front, .card-back {
+    position: absolute; width: 100%; height: 100%; backface-visibility: hidden;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px;
+}
+.card-back { transform: rotateY(180deg); color: #fff; padding: 5px; text-align: center; }
+.match { background: var(--green) !important; color: #000 !important; }
+.wrong { background: #e74c3c !important; }
+
+/* MINI GAMES */
+.math-container { display: flex; align-items: center; gap: 20px; margin: 20px; perspective: 1000px; }
+.math-card, .limbo-card { 
+    width: 150px; height: 220px; background: transparent; border: 4px solid #fff; 
+    cursor: pointer; transition: transform 0.6s; transform-style: preserve-3d; -webkit-transform-style: preserve-3d; position: relative;
+}
+.math-card.revealed, .limbo-card.revealed { transform: rotateY(180deg); }
+.math-front, .math-back, .limbo-front, .limbo-back { 
+    position: absolute; width: 100%; height: 100%;
+    backface-visibility: hidden; -webkit-backface-visibility: hidden;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 14px;
+    background: #000;
+}
+.math-back, .limbo-back { transform: rotateY(180deg); -webkit-transform: rotateY(180deg); padding: 10px; }
+
+#limbo-area { 
+    position: relative; width: 95vw; max-width: 1100px; height: 400px; 
+    margin: 10px; border: 4px solid #333; background: #000; overflow: hidden; border-radius: 10px; 
+}
+.limbo-card { position: absolute; transition: left 0.4s ease-in-out, top 0.4s ease-in-out, transform 0.6s; }
+
+/* WAVE SCREEN */
+#wave-screen { position: fixed; inset: 0; z-index: 1000; display: none; background: linear-gradient(180deg, #001a33 0%, #000 100%); }
+#wave-screen.active { display: block; }
+#wave-canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.wave-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.8); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1100; }
+#wave-ui { position: absolute; top: 0; left: 0; right: 0; z-index: 1010; display: flex; justify-content: space-between; padding: 20px; pointer-events: none; }
+
+/* SHARED UI */
+.input-wrapper {
+    display: flex; align-items: center; gap: 10px; width: 90%; max-width: 650px;
+    background: var(--comment-bg); border: 5px solid #000; border-radius: 12px; padding: 10px;
+}
+.comment-input {
+    flex: 1; background: var(--comment-inner); border: 3px solid #000;
+    color: #fff; font-family: 'Press Start 2P'; font-size: 14px; padding: 12px; outline: none;
+}
+#suggestions {
+    position: absolute; bottom: 105%; left: 0; width: 100%; background: #111;
+    border: 4px solid #000; border-radius: 10px; display: none; max-height: 200px; overflow-y: auto; z-index: 500;
+}
+.suggestion-item { padding: 12px; font-size: 10px; cursor: pointer; border-bottom: 2px solid #222; text-align: left; }
+.btn { cursor: pointer; border: 4px solid #000; padding: 15px; font-family: 'Press Start 2P'; margin: 10px; color: #fff; box-shadow: 0 5px 0 #000; font-size: 10px; }
+.correct-glow { box-shadow: 0 0 30px var(--green); border-color: var(--green); }
+.wrong-glow { box-shadow: 0 0 30px var(--extreme-red); border-color: var(--extreme-red); }
+</style>
+</head>
+<body>
+
+<div id="bg-layer"></div>
+
+<div id="app">
+    <div id="title-screen" class="screen active">
+        <div class="gd-logo">GD ARCADE</div>
+        <button class="btn" style="background:#CC44FF; width:350px;" onclick="showScreen('wave-diff-screen')">FLAPPY WAVE</button>
+        <button class="btn" style="background:var(--green); color:#000; width:350px;" onclick="showScreen('mode-screen')">GD-ORDLE</button>
+        <button class="btn" style="background:var(--extreme-red); width:350px;" onclick="startMath()">DEMON MATH</button>
+        <button class="btn" style="background:var(--gd-blue); width:350px;" onclick="startLimbo()">LIMBO CARDS</button>
+    </div>
+
+    <div id="math-screen" class="screen">
+        <div class="gd-logo" style="font-size: 18px;">WHICH IS HARDER?</div>
+        <div class="math-container">
+            <div id="m-card-0" class="math-card" onclick="revealMathCard(0)">
+                <div class="math-front" style="font-size: 30px;">?</div>
+                <div class="math-back"><h3 id="m-name-0" style="font-size:10px;"></h3><p id="m-diff-0" style="margin-top:10px; color:var(--yellow); font-size:8px; opacity:0;"></p></div>
+            </div>
+            <div style="font-size: 20px; color: var(--extreme-red);">VS</div>
+            <div id="m-card-1" class="math-card" onclick="revealMathCard(1)">
+                <div class="math-front" style="font-size: 30px;">?</div>
+                <div class="math-back"><h3 id="m-name-1" style="font-size:10px;"></h3><p id="m-diff-1" style="margin-top:10px; color:var(--yellow); font-size:8px; opacity:0;"></p></div>
+            </div>
+        </div>
+        <div id="math-controls" style="display:none; gap:10px;">
+            <button class="btn" style="background:#444; width:120px;" onclick="checkMath(0)">LEFT</button>
+            <button class="btn" style="background:#444; width:120px;" onclick="checkMath(1)">RIGHT</button>
+        </div>
+        <div id="math-score-text" style="color:var(--cyan); margin-top:10px; font-size:12px;">STREAK: 0</div>
+        <button onclick="showScreen('title-screen')" class="btn" style="background:#333; width:200px; font-size:8px;">EXIT</button>
+    </div>
+
+    <div id="limbo-screen" class="screen">
+        <div class="gd-logo" id="limbo-status" style="font-size: 18px;">FIND THE GOLD CARD</div>
+        <div id="limbo-area"></div>
+        <div id="limbo-controls">
+            <button id="limbo-start-btn" class="btn" style="background:var(--gold); color:#000;" onclick="shuffleLimbo()">SHUFFLE</button>
+            <button onclick="showScreen('title-screen')" class="btn" style="background:#333; font-size: 8px;">EXIT</button>
+        </div>
+    </div>
+
+    <div id="mode-screen" class="screen">
+        <div class="gd-logo" style="font-size: 18px;">DATABASE</div>
+        <button onclick="startOrdle('levels')" class="btn" style="background:var(--gd-blue); width:350px;">LEVELS</button>
+        <button onclick="startOrdle('players')" class="btn" style="background:#ff8000; width:350px;">CREATORS</button>
+        <button onclick="showScreen('title-screen')" class="btn" style="background:#333; width:350px; font-size:8px;">BACK</button>
+    </div>
+
+    <div id="game-screen" class="screen">
+        <div id="mode-info" style="font-size:10px; margin-bottom:10px; color:var(--cyan);">LEVELS</div>
+        <div id="game-container"></div>
+        <div style="position:relative; width: 100%; display: flex; justify-content: center;">
+            <div id="suggestions"></div>
+            <div class="input-wrapper">
+                <input type="text" id="main-input" class="comment-input" placeholder="GUESS..." autocomplete="off">
+                <button class="btn" style="background:var(--green); color:#000; padding:10px; margin:0; border-radius:5px;" onclick="forceSubmit()">GO</button>
+            </div>
+        </div>
+        <button onclick="showScreen('mode-screen')" class="btn" style="background:#333; width:200px; font-size:8px; margin-top:15px;">BACK</button>
+    </div>
+
+    <div id="wave-diff-screen" class="screen">
+        <div class="gd-logo" style="font-size: 18px;">WAVE DIFFICULTY</div>
+        <button onclick="initWave(3.5, 210)" class="btn" style="background:var(--green); color:#000; width:350px;">EASY</button>
+        <button onclick="initWave(7.0, 170)" class="btn" style="background:var(--yellow); color:#000; width:350px;">HARD</button>
+        <button onclick="initWave(12.0, 140)" class="btn" style="background:var(--extreme-red); width:350px;">EXTREME</button>
+        <button onclick="showScreen('title-screen')" class="btn" style="background:#333; width:350px; font-size:8px;">BACK</button>
+    </div>
+</div>
+
+<div id="wave-screen">
+    <div id="wave-ui">
+        <div style="color:var(--yellow)">SCORE: <span id="w-score">0</span></div>
+        <div style="color:var(--cyan); font-size:10px;">BEST: <span id="w-best">0</span></div>
+    </div>
+    <canvas id="wave-canvas"></canvas>
+    <div id="wave-overlay" class="wave-overlay">
+        <h2 id="wave-status" style="color:#CC44FF; margin-bottom:20px;">WAVE DASH</h2>
+        <button class="btn" style="background:#CC44FF; width:250px;" onclick="startWave()">START</button>
+        <button class="btn" style="background:#333; width:250px;" onclick="hideWave()">EXIT</button>
+    </div>
+</div>
+
+<script>
+const DB = {
+    levels: [
+        /* ── OFFICIAL ROBTOP ── */
+        { name:"STEREO MADNESS",           creator:"ROBTOP",        stars:1,  diff:1,   ver:"1.0" },
+        { name:"BACK ON TRACK",            creator:"ROBTOP",        stars:2,  diff:2,   ver:"1.0" },
+        { name:"POLARGEIST",               creator:"ROBTOP",        stars:3,  diff:5,   ver:"1.0" },
+        { name:"DRY OUT",                  creator:"ROBTOP",        stars:4,  diff:8,   ver:"1.0" },
+        { name:"BASE AFTER BASE",          creator:"ROBTOP",        stars:5,  diff:13,  ver:"1.0" },
+        { name:"CAN'T LET GO",             creator:"ROBTOP",        stars:6,  diff:17,  ver:"1.0" },
+        { name:"JUMPER",                   creator:"ROBTOP",        stars:7,  diff:24,  ver:"1.0" },
+        { name:"TIME MACHINE",             creator:"ROBTOP",        stars:8,  diff:29,  ver:"1.0" },
+        { name:"CYCLES",                   creator:"ROBTOP",        stars:9,  diff:36,  ver:"1.0" },
+        { name:"XSTEP",                    creator:"ROBTOP",        stars:10, diff:40,  ver:"1.0" },
+        { name:"CLUTTERFUNK",              creator:"ROBTOP",        stars:10, diff:44,  ver:"1.0" },
+        { name:"THEORY OF EVERYTHING",     creator:"ROBTOP",        stars:10, diff:47,  ver:"1.0" },
+        { name:"ELECTROMAN ADVENTURES",    creator:"ROBTOP",        stars:10, diff:46,  ver:"1.0" },
+        { name:"CLUBSTEP",                 creator:"ROBTOP",        stars:10, diff:60,  ver:"1.0" },
+        { name:"ELECTRODYNAMIX",           creator:"ROBTOP",        stars:10, diff:45,  ver:"1.2" },
+        { name:"HEXAGON FORCE",            creator:"ROBTOP",        stars:10, diff:43,  ver:"1.3" },
+        { name:"BLAST PROCESSING",         creator:"ROBTOP",        stars:10, diff:32,  ver:"1.5" },
+        { name:"THEORY OF EVERYTHING 2",   creator:"ROBTOP",        stars:10, diff:75,  ver:"1.6" },
+        { name:"GEOMETRICAL DOMINATOR",    creator:"ROBTOP",        stars:10, diff:34,  ver:"1.6" },
+        { name:"DEADLOCKED",               creator:"ROBTOP",        stars:10, diff:83,  ver:"1.7" },
+        { name:"FINGERDASH",               creator:"ROBTOP",        stars:10, diff:50,  ver:"2.0" },
+        { name:"DASH",                     creator:"ROBTOP",        stars:10, diff:52,  ver:"2.2" },
+        /* ── EASY DEMONS ── */
+        { name:"THE NIGHTMARE",            creator:"JERKRAT",       stars:10, diff:58,  ver:"1.6" },
+        { name:"TOE2 SPAM CHALLENGE",      creator:"ZOBROS",        stars:10, diff:59,  ver:"1.6" },
+        { name:"ULTIMATE DEMON MIX",       creator:"ZOBROS",        stars:10, diff:61,  ver:"1.7" },
+        { name:"THE ULTIMATE PHASE",       creator:"MICHIGUN",      stars:10, diff:63,  ver:"1.7" },
+        { name:"NINE CIRCLES",             creator:"ZOBROS",        stars:10, diff:64,  ver:"1.6" },
+        { name:"BLUE HELL",                creator:"ZOBROS",        stars:10, diff:63,  ver:"1.7" },
+        { name:"HEXAGON FORCE V2",         creator:"SWANN",         stars:10, diff:64,  ver:"1.9" },
+        { name:"HARD MACHINE",             creator:"G4LVATRON",     stars:10, diff:62,  ver:"1.9" },
+        { name:"MY LIFE IS GOING ON",      creator:"CREATORJERD",   stars:10, diff:63,  ver:"2.0" },
+        { name:"ICY FINGERS",              creator:"ALKALI",        stars:10, diff:65,  ver:"2.0" },
+        /* ── MEDIUM DEMONS ── */
+        { name:"ACU",                      creator:"SERPONGE",      stars:10, diff:67,  ver:"2.0" },
+        { name:"CONICAL DEPRESSION",       creator:"SERPONGE",      stars:10, diff:68,  ver:"2.0" },
+        { name:"RETRAY",                   creator:"SERPONGE",      stars:10, diff:69,  ver:"2.0" },
+        { name:"DARK TRAVEL",              creator:"REINCARNATE",   stars:10, diff:71,  ver:"2.0" },
+        { name:"CADREGA CITY",             creator:"SERPONGE",      stars:10, diff:72,  ver:"2.0" },
+        { name:"SPECTRUM CYCLONE",         creator:"QUASAR",        stars:10, diff:74,  ver:"2.0" },
+        { name:"TOO FAST",                 creator:"CYCLIC",        stars:10, diff:73,  ver:"2.0" },
+        { name:"COLD SWEAT",               creator:"PENNUTOH",      stars:10, diff:74,  ver:"2.1" },
+        { name:"SPEED RACER",              creator:"WOOGI1411",     stars:10, diff:75,  ver:"2.0" },
+        { name:"GOLDEN",                   creator:"TRICK",         stars:10, diff:77,  ver:"2.0" },
+        { name:"FUTURE FUNK",              creator:"ALKALI",        stars:10, diff:79,  ver:"2.0" },
+        { name:"RAINBOW ROAD",             creator:"ROADBOSE",      stars:10, diff:78,  ver:"2.0" },
+        { name:"CLUBSTEP REBORN",          creator:"DANOLEX",       stars:10, diff:76,  ver:"2.1" },
+        { name:"ACID RAIN",                creator:"SWANN",         stars:10, diff:77,  ver:"2.1" },
+        /* ── HARD DEMONS ── */
+        { name:"JAWBREAKER",               creator:"SERPONGE",      stars:10, diff:82,  ver:"2.0" },
+        { name:"AFTERMATH",                creator:"SKULLO",        stars:10, diff:84,  ver:"2.1" },
+        { name:"SCARLET SURGE",            creator:"MICHIGUN",      stars:10, diff:86,  ver:"2.0" },
+        { name:"FIREWORK",                 creator:"KRAZYMAN50",    stars:10, diff:88,  ver:"2.0" },
+        { name:"BLACK ICE",                creator:"BIANOX",        stars:10, diff:89,  ver:"2.0" },
+        { name:"RAGNAROK",                 creator:"LANDORUS",      stars:10, diff:85,  ver:"2.0" },
+        { name:"INFERNAL ABYSS",           creator:"DARNOC2",       stars:10, diff:87,  ver:"2.0" },
+        { name:"SONIC BLASTER",            creator:"CYCLIC",        stars:10, diff:88,  ver:"2.0" },
+        { name:"ABSTRACT WORLD",           creator:"G4LVATRON",     stars:10, diff:83,  ver:"2.0" },
+        { name:"WINDY LANDSCAPE",          creator:"SERPONGE",      stars:10, diff:84,  ver:"2.1" },
+        { name:"EMPYREAN",                 creator:"ALKALI",        stars:10, diff:86,  ver:"2.1" },
+        { name:"TOXIN LAB II",             creator:"WOOGI1411",     stars:10, diff:85,  ver:"2.0" },
+        { name:"CATACLYSM REBORN",         creator:"GGB0Y",         stars:10, diff:89,  ver:"2.1" },
+        /* ── INSANE DEMONS ── */
+        { name:"SUPERSONIC",               creator:"RIOT",          stars:10, diff:93,  ver:"1.9" },
+        { name:"THE HELL ZONE",            creator:"ZOBROS",        stars:10, diff:96,  ver:"1.9" },
+        { name:"PROBLEMATIC",              creator:"DARNOC2",       stars:10, diff:98,  ver:"2.0" },
+        { name:"DEATH CORRIDOR",           creator:"SERPONGE",      stars:10, diff:92,  ver:"1.9" },
+        { name:"DARK PARADE",              creator:"DORAMI",        stars:10, diff:94,  ver:"2.0" },
+        { name:"DARK MATTER",              creator:"MANIX648",      stars:10, diff:95,  ver:"2.0" },
+        { name:"ASTRAL DIVINITY",          creator:"WEOWEOTEO",     stars:10, diff:97,  ver:"2.0" },
+        { name:"SILENT CLUBSTEP",          creator:"SERPONGE",      stars:10, diff:99,  ver:"2.0" },
+        { name:"POLTERGEIST",              creator:"KNOBBELBOY",    stars:10, diff:91,  ver:"2.0" },
+        { name:"NECROPOLIS",               creator:"NOCTUA",        stars:10, diff:93,  ver:"2.0" },
+        { name:"SHIVER",                   creator:"SKULLO",        stars:10, diff:96,  ver:"2.1" },
+        { name:"ZODIAC",                   creator:"APTEAM",        stars:10, diff:98,  ver:"2.1" },
+        { name:"KILLBOT",                  creator:"RIOT",          stars:10, diff:97,  ver:"2.0" },
+        { name:"IMPULSE",                  creator:"LANDORUS",      stars:10, diff:95,  ver:"2.1" },
+        /* ── EXTREME DEMONS ── */
+        { name:"BLOODBATH",                creator:"RIOT",          stars:10, diff:100, ver:"1.9" },
+        { name:"ICE CARBON DIABLO X",      creator:"KRAZYMAN50",    stars:10, diff:103, ver:"1.9" },
+        { name:"CATACLYSM",                creator:"GGB0Y",         stars:10, diff:106, ver:"1.9" },
+        { name:"SONIC WAVE",               creator:"CYCLIC",        stars:10, diff:109, ver:"1.9" },
+        { name:"ULTRA PARACOSM",           creator:"MANIX648",      stars:10, diff:113, ver:"2.0" },
+        { name:"SONIC WAVE INFINITY",      creator:"APTEAM",        stars:10, diff:114, ver:"2.1" },
+        { name:"SAKUPEN HELL",             creator:"OBS",           stars:10, diff:116, ver:"2.0" },
+        { name:"YATAGARASU",               creator:"APTEAM",        stars:10, diff:119, ver:"2.0" },
+        { name:"ACROPOLIS",                creator:"NEPTUNE",       stars:10, diff:121, ver:"2.1" },
+        { name:"PHOBOS",                   creator:"TYGRYSEK",      stars:10, diff:123, ver:"2.0" },
+        { name:"EREBUS",                   creator:"NOCTUA",        stars:10, diff:126, ver:"2.1" },
+        { name:"THE HALLUCINATION",        creator:"G4LVATRON",     stars:10, diff:127, ver:"2.1" },
+        { name:"LIMBO",                    creator:"MINDCAP",       stars:10, diff:130, ver:"2.1" },
+        { name:"CATASTROPHE",              creator:"PENNUTOH",      stars:10, diff:133, ver:"2.1" },
+        { name:"NIFLHEIM",                 creator:"QUASAR",        stars:10, diff:136, ver:"2.1" },
+        { name:"KENOS",                    creator:"PENNUTOH",      stars:10, diff:138, ver:"2.1" },
+        { name:"BLADE OF JUSTICE",         creator:"SRGUILLESTER",  stars:10, diff:140, ver:"2.1" },
+        { name:"NHELV",                    creator:"PARTITION",     stars:10, diff:143, ver:"2.1" },
+        { name:"QUANTUM PROCESSING",       creator:"DORAMI",        stars:10, diff:145, ver:"2.1" },
+        { name:"PLASMA PULSE FINALE",      creator:"ABSOLUTE",      stars:10, diff:147, ver:"2.1" },
+        { name:"SLAUGHTERHOUSE",           creator:"ICEDCAVE",      stars:10, diff:149, ver:"2.1" },
+        { name:"ARTIFICIAL ASCENT",        creator:"KNOBBELBOY",    stars:10, diff:152, ver:"2.1" },
+        { name:"ACHERON",                  creator:"RUSTAM",        stars:10, diff:155, ver:"2.1" },
+        { name:"TARTARUS",                 creator:"DOLPHY",        stars:10, diff:158, ver:"2.1" },
+        { name:"TIDAL WAVE",               creator:"ONILOU",        stars:10, diff:160, ver:"2.1" },
+        { name:"THE ESCHATON",             creator:"ICEDCAVE",      stars:10, diff:161, ver:"2.2" },
+        { name:"AVERNUS",                  creator:"EXEN",          stars:10, diff:162, ver:"2.2" },
+        { name:"ABYSS OF DARKNESS",        creator:"MATIPON",       stars:10, diff:163, ver:"2.2" },
+        { name:"SILENT CLUBSTEP",          creator:"SERPONGE",      stars:10, diff:99,  ver:"2.0" },
+        { name:"SILENT CIRCLES",           creator:"APTEAM",        stars:10, diff:101, ver:"2.1" },
+        { name:"BAUSHA VORTEX",            creator:"MANIX648",      stars:10, diff:104, ver:"2.0" },
+        { name:"ATHANATOS",                creator:"PENNUTOH",      stars:10, diff:135, ver:"2.1" },
+        { name:"HEARTBEAT",                creator:"DORAMI",        stars:10, diff:129, ver:"2.1" },
+        { name:"THE HALLUCINATION",        creator:"G4LVATRON",     stars:10, diff:127, ver:"2.1" },
+        { name:"DECEPTION DIVE",           creator:"ICEDCAVE",      stars:10, diff:128, ver:"2.1" },
+        { name:"ZODIAC",                   creator:"APTEAM",        stars:10, diff:132, ver:"2.1" },
+        { name:"NECROPOLIS",               creator:"NOCTUA",        stars:10, diff:134, ver:"2.1" },
+        { name:"DEATH CORRIDOR 2",         creator:"SERPONGE",      stars:10, diff:139, ver:"2.1" },
+        { name:"ULTRAVIOLET",              creator:"GEMINIZE",      stars:10, diff:141, ver:"2.1" },
+        { name:"COSMIC CYCLONE",           creator:"RYAMU",         stars:10, diff:153, ver:"2.1" },
+        { name:"FIREWORK V2",              creator:"KRAZYMAN50",    stars:10, diff:144, ver:"2.1" },
+        { name:"SHIRON",                   creator:"RYAMU",         stars:10, diff:156, ver:"2.1" },
+        { name:"SILENT CIRCLES 2",         creator:"APTEAM",        stars:10, diff:110, ver:"2.1" },
+        { name:"CURSED CAVERNS",           creator:"BIANOX",        stars:10, diff:146, ver:"2.1" },
+        { name:"KARMIC RETRIBUTION",       creator:"EXEN",          stars:10, diff:150, ver:"2.2" },
+        { name:"OBLIVION",                 creator:"RUSTAM",        stars:10, diff:154, ver:"2.2" },
+        { name:"THE VOID",                 creator:"ICEDCAVE",      stars:10, diff:157, ver:"2.2" },
+        /* ── 2.2 LEVELS ── */
+        { name:"EXPLORERS",                creator:"ROBTOP",        stars:10, diff:55,  ver:"2.2" },
+        { name:"FEARLESS",                 creator:"ROBTOP",        stars:10, diff:53,  ver:"2.2" },
+        { name:"PAYLOAD",                  creator:"ROBTOP",        stars:10, diff:51,  ver:"2.2" },
+        { name:"PLATFORMER ADVENTURES",    creator:"ROBTOP",        stars:10, diff:49,  ver:"2.2" },
+        { name:"SEASON 1 MAIN SONG",       creator:"KNOBBELBOY",    stars:10, diff:76,  ver:"2.2" },
+        { name:"ABSOLUTE ZERO",            creator:"EXEN",          stars:10, diff:164, ver:"2.2" },
+        { name:"NOXIOUS",                  creator:"MATIPON",       stars:10, diff:165, ver:"2.2" }
+    ],
+    players: [
+        { name:"ROBTOP",        country:"SWEDEN",      role:"DEV",     year:2013 },
+        { name:"RIOT",          country:"DENMARK",     role:"CREATOR", year:2014 },
+        { name:"JERKRAT",       country:"USA",         role:"CREATOR", year:2014 },
+        { name:"ZOBROS",        country:"FINLAND",     role:"CREATOR", year:2014 },
+        { name:"GGB0Y",         country:"BRAZIL",      role:"CREATOR", year:2015 },
+        { name:"KRAZYMAN50",    country:"CANADA",      role:"CREATOR", year:2015 },
+        { name:"SERPONGE",      country:"FRANCE",      role:"CREATOR", year:2015 },
+        { name:"MANIX648",      country:"FRANCE",      role:"CREATOR", year:2015 },
+        { name:"MICHIGUN",      country:"PHILIPPINES", role:"CREATOR", year:2015 },
+        { name:"SWANN",         country:"UK",          role:"CREATOR", year:2015 },
+        { name:"WOOGI1411",     country:"S.KOREA",     role:"CREATOR", year:2015 },
+        { name:"CYCLIC",        country:"USA",         role:"CREATOR", year:2016 },
+        { name:"KNOBBELBOY",    country:"NETHERLANDS", role:"CREATOR", year:2016 },
+        { name:"REINCARNATE",   country:"USA",         role:"CREATOR", year:2016 },
+        { name:"TRICK",         country:"USA",         role:"CREATOR", year:2016 },
+        { name:"BIANOX",        country:"GERMANY",     role:"CREATOR", year:2016 },
+        { name:"G4LVATRON",     country:"USA",         role:"CREATOR", year:2016 },
+        { name:"ROADBOSE",      country:"BRAZIL",      role:"CREATOR", year:2016 },
+        { name:"LANDORUS",      country:"USA",         role:"CREATOR", year:2016 },
+        { name:"CREATORJERD",   country:"USA",         role:"CREATOR", year:2016 },
+        { name:"APTEAM",        country:"GLOBAL",      role:"COLLAB",  year:2017 },
+        { name:"ABSOLUTE",      country:"USA",         role:"CREATOR", year:2017 },
+        { name:"NEPTUNE",       country:"USA",         role:"CREATOR", year:2017 },
+        { name:"QUASAR",        country:"USA",         role:"CREATOR", year:2017 },
+        { name:"SKULLO",        country:"SPAIN",       role:"CREATOR", year:2017 },
+        { name:"DANOLEX",       country:"NORWAY",      role:"CREATOR", year:2017 },
+        { name:"TYGRYSEK",      country:"POLAND",      role:"CREATOR", year:2018 },
+        { name:"RUSTAM",        country:"RUSSIA",      role:"CREATOR", year:2018 },
+        { name:"PENNUTOH",      country:"USA",         role:"CREATOR", year:2018 },
+        { name:"ALKALI",        country:"USA",         role:"CREATOR", year:2018 },
+        { name:"WEOWEOTEO",     country:"NETHERLANDS", role:"CREATOR", year:2018 },
+        { name:"GEMINIZE",      country:"USA",         role:"CREATOR", year:2018 },
+        { name:"RYAMU",         country:"JAPAN",       role:"CREATOR", year:2018 },
+        { name:"NOCTUA",        country:"USA",         role:"CREATOR", year:2019 },
+        { name:"PARTITION",     country:"GERMANY",     role:"CREATOR", year:2019 },
+        { name:"SRGUILLESTER",  country:"SPAIN",       role:"CREATOR", year:2019 },
+        { name:"DORAMI",        country:"JAPAN",       role:"CREATOR", year:2019 },
+        { name:"DARNOC2",       country:"USA",         role:"CREATOR", year:2019 },
+        { name:"DOLPHY",        country:"AUSTRALIA",   role:"CREATOR", year:2019 },
+        { name:"OBS",           country:"NORWAY",      role:"CREATOR", year:2019 },
+        { name:"ICEDCAVE",      country:"RUSSIA",      role:"CREATOR", year:2020 },
+        { name:"ONILOU",        country:"SWEDEN",      role:"CREATOR", year:2020 },
+        { name:"MINDCAP",       country:"UK",          role:"CREATOR", year:2020 },
+        { name:"EXEN",          country:"RUSSIA",      role:"CREATOR", year:2021 },
+        { name:"MATIPON",       country:"THAILAND",    role:"CREATOR", year:2021 }
+    ]
+};
+
+// --- FIXED FLAPPY WAVE ENGINE ---
+const canvas = document.getElementById('wave-canvas');
+const ctx = canvas.getContext('2d');
+let wActive = false, wY, wSpeed, wGap, wPipes = [], wHolding = false, wScore = 0, wBest = 0, trail = [];
+
+function initWave(speed, gap) {
+    wSpeed = speed; wGap = gap;
+    document.getElementById('wave-diff-screen').classList.remove('active');
+    document.getElementById('wave-screen').classList.add('active');
+    canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+    wY = canvas.height / 2; wPipes = []; trail = []; wScore = 0;
+    document.getElementById('wave-overlay').style.display = 'flex';
+}
+
+function startWave() {
+    wActive = true; wPipes = []; trail = []; wY = canvas.height / 2; wScore = 0;
+    window.onmousedown = inputDown; window.ontouchstart = inputDown;
+    document.getElementById('w-score').innerText = "0";
+    document.getElementById('wave-overlay').style.display = 'none';
+    requestAnimationFrame(waveLoop);
+}
+
+function drawBlock(x, y, w, h) {
+    let grad = ctx.createLinearGradient(x, y, x, y + h);
+    grad.addColorStop(0, '#001a33'); grad.addColorStop(1, '#000000');
+    ctx.fillStyle = grad; ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = '#00F0FF'; ctx.lineWidth = 3; ctx.strokeRect(x, y, w, h);
+}
+
+function drawWaveIcon(x, y, isUp) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(isUp ? -0.5 : 0.5);
+    ctx.shadowBlur = 15; ctx.shadowColor = "#00F0FF";
+    ctx.fillStyle = "#00F0FF"; ctx.beginPath();
+    ctx.moveTo(25, 0); ctx.lineTo(-15, -15); ctx.lineTo(-10, 0); ctx.lineTo(-15, 15); ctx.closePath();
+    ctx.fill(); ctx.restore();
+}
+
+function waveLoop() {
+    if (!wActive) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    wY += wHolding ? -wSpeed * 1.3 : wSpeed * 1.3;
+    trail.push({ x: 150, y: wY });
+    if (trail.length > 60) trail.shift();
+    
+    ctx.strokeStyle = "#00F0FF"; ctx.lineWidth = 4; ctx.beginPath();
+    if(trail.length > 0) ctx.moveTo(trail[0].x, trail[0].y);
+    trail.forEach(p => { p.x -= wSpeed; ctx.lineTo(p.x, p.y); });
+    ctx.stroke();
+
+    if (wY < 0 || wY > canvas.height) wActive = false;
+    if (wPipes.length === 0 || wPipes[wPipes.length-1].x < canvas.width - 400) {
+        wPipes.push({ x: canvas.width, top: 100 + Math.random()*(canvas.height-wGap-200), passed: false });
+    }
+
+    wPipes.forEach(p => {
+        p.x -= wSpeed;
+        drawBlock(p.x, 0, 75, p.top);
+        drawBlock(p.x, p.top + wGap, 75, canvas.height);
+        if (150 > p.x && 150 < p.x + 75) {
+            if (wY < p.top || wY > p.top + wGap) wActive = false;
+            else if (!p.passed) { p.passed = true; wScore++; document.getElementById('w-score').innerText = wScore; }
+        }
+    });
+
+    drawWaveIcon(150, wY, wHolding);
+    if (!wActive) {
+        if(wScore > wBest) { wBest = wScore; document.getElementById('w-best').innerText = wBest; }
+        document.getElementById('wave-overlay').style.display = 'flex'; 
+    }
+    else requestAnimationFrame(waveLoop);
+}
+
+const inputDown = (e) => { if(e.cancelable) e.preventDefault(); wHolding = true; };
+window.onmouseup = () => wHolding = false;
+window.ontouchend = () => wHolding = false;
+function hideWave() { wActive = false; window.onmousedown = null; window.ontouchstart = null; document.getElementById('wave-screen').classList.remove('active'); showScreen('title-screen'); }
+
+// --- GD-ORDLE ENGINE ---
+let currentMode = "levels", secret = null;
+const input = document.getElementById('main-input');
+const suggestBox = document.getElementById('suggestions');
+const container = document.getElementById('game-container');
+
+function startOrdle(mode) {
+    currentMode = mode; secret = DB[mode][Math.floor(Math.random()*DB[mode].length)];
+    container.innerHTML = ''; document.getElementById('mode-info').innerText = mode.toUpperCase();
+    input.disabled = false; document.querySelector('.input-wrapper').style.opacity = '1';
+    showScreen('game-screen');
+}
+
+input.addEventListener('input', () => {
+    const val = input.value.toUpperCase().trim();
+    suggestBox.innerHTML = "";
+    if (val.length > 0) {
+        const matches = DB[currentMode].filter(i => i.name.includes(val));
+        if (matches.length > 0) {
+            suggestBox.style.display = "block";
+            matches.forEach(m => {
+                const div = document.createElement('div');
+                div.className = "suggestion-item"; div.innerText = m.name;
+                div.onclick = () => submitGuess(m);
+                suggestBox.appendChild(div);
+            });
+        }
+    } else suggestBox.style.display = "none";
+});
+
+function forceSubmit() {
+    const found = DB[currentMode].find(i => i.name === input.value.toUpperCase().trim());
+    if (found) submitGuess(found);
+}
+
+function submitGuess(guess) {
+    input.value = ""; suggestBox.style.display = "none";
+    const row = document.createElement('div'); row.className = "guess-row";
+    let allMatch = true;
+    Object.keys(guess).forEach((key, i) => {
+        const card = document.createElement('div'); card.className = "card";
+        const isMatch = guess[key].toString() === secret[key].toString();
+        if (!isMatch) allMatch = false;
+        card.innerHTML = `<div class="card-front">?</div><div class="card-back ${isMatch?'match':'wrong'}">${guess[key]}</div>`;
+        row.appendChild(card);
+        setTimeout(() => { card.classList.add('reveal'); }, i * 150);
+    });
+    container.prepend(row);
+    if (allMatch) {
+        const delay = Object.keys(guess).length * 150 + 600;
+        setTimeout(() => {
+            document.getElementById('mode-info').innerText = '🎉 YOU WIN!';
+            input.disabled = true;
+            document.querySelector('.input-wrapper').style.opacity = '0.4';
+        }, delay);
+    }
+}
+
+// --- DEMON MATH ENGINE ---
+let mScore = 0, curMath = [];
+function startMath() { mScore = 0; updateMathScore(); showScreen('math-screen'); nextMathRound(); }
+function nextMathRound() {
+    document.getElementById('math-controls').style.display = 'none';
+    const cards = [document.getElementById('m-card-0'), document.getElementById('m-card-1')];
+    cards.forEach(c => { c.classList.remove('revealed', 'correct-glow', 'wrong-glow'); c.querySelector('p').style.opacity = 0; });
+    let idx0 = Math.floor(Math.random()*DB.levels.length), idx1;
+    do { idx1 = Math.floor(Math.random()*DB.levels.length); } while (idx1 === idx0);
+    curMath = [DB.levels[idx0], DB.levels[idx1]];
+    document.getElementById('m-name-0').innerText = curMath[0].name; document.getElementById('m-name-1').innerText = curMath[1].name;
+    document.getElementById('m-diff-0').innerText = "POWER: " + curMath[0].diff; document.getElementById('m-diff-1').innerText = "POWER: " + curMath[1].diff;
+}
+function revealMathCard(idx) { document.getElementById('m-card-'+idx).classList.add('revealed'); if(document.querySelectorAll('.math-card.revealed').length >= 2) document.getElementById('math-controls').style.display = 'flex'; }
+function checkMath(choice) {
+    const isL = curMath[0].diff >= curMath[1].diff;
+    const win = (choice === 0 && isL) || (choice === 1 && !isL);
+    document.getElementById('m-diff-0').style.opacity = 1; document.getElementById('m-diff-1').style.opacity = 1;
+    if(win) { mScore++; document.getElementById('m-card-'+choice).classList.add('correct-glow'); setTimeout(nextMathRound, 1000); }
+    else { document.getElementById('m-card-'+choice).classList.add('wrong-glow'); document.getElementById('m-card-'+(1-choice)).classList.add('correct-glow'); setTimeout(startMath, 1500); }
+    updateMathScore();
+}
+function updateMathScore() { document.getElementById('math-score-text').innerText = "STREAK: " + mScore; }
+
+// --- LIMBO ENGINE ---
+let limboCards = [], goldIdx = 0, shuffling = false;
+function startLimbo() {
+    showScreen('limbo-screen');
+    const area = document.getElementById('limbo-area'); area.innerHTML = ''; limboCards = [];
+    goldIdx = Math.floor(Math.random()*8);
+    document.getElementById('limbo-start-btn').style.display = 'none';
+    document.getElementById('limbo-status').innerText = 'MEMORIZE THE GOLD CARD!';
+    // Spawn all cards FACE-UP so player can see the gold
+    for(let i=0; i<8; i++) {
+        const card = document.createElement('div'); card.className = "limbo-card revealed";
+        card.style.left = (10 + i * 115) + "px"; card.style.top = "100px";
+        card.innerHTML = `<div class="limbo-front">?</div><div class="limbo-back" style="background:${i===goldIdx?'#FFD700':'#333'}; color:${i===goldIdx?'#000':'#fff'}">${i===goldIdx?'⭐ GOLD':'LOCK'}</div>`;
+        card.onclick = () => selectLimbo(i); area.appendChild(card); limboCards.push(card);
+    }
+    // Highlight gold card with glow
+    limboCards[goldIdx].style.boxShadow = '0 0 25px #FFD700';
+    limboCards[goldIdx].style.border = '4px solid #FFD700';
+    // After 2.5s flip all face-down, then shuffle
+    let countdown = 3;
+    const cdItv = setInterval(() => {
+        countdown--;
+        document.getElementById('limbo-status').innerText = `SHUFFLING IN ${countdown}...`;
+        if(countdown <= 0) {
+            clearInterval(cdItv);
+            limboCards.forEach(c => { c.classList.remove('revealed'); c.style.boxShadow=''; c.style.border='4px solid #fff'; });
+            document.getElementById('limbo-status').innerText = 'WHERE IS THE GOLD?';
+            setTimeout(shuffleLimbo, 600);
+        }
+    }, 800);
+}
+function shuffleLimbo() {
+    if(shuffling) return; shuffling = true;
+    let count = 0;
+    const itv = setInterval(() => {
+        limboCards.forEach(c => { c.style.left = (10 + Math.random()*870) + "px"; c.style.top = (60 + Math.random()*180) + "px"; });
+        if(++count > 14) { clearInterval(itv); shuffling = false; limboCards.forEach((c, i) => { c.style.left = (10+i*115)+"px"; c.style.top="100px"; }); }
+    }, 350);
+}
+function selectLimbo(idx) {
+    if(shuffling) return;
+    limboCards.forEach(c => c.classList.add('revealed'));
+    const won = idx === goldIdx;
+    document.getElementById('limbo-status').innerText = won ? '🏆 GOLD FOUND!' : '💀 WRONG CARD!';
+    limboCards[goldIdx].style.boxShadow = '0 0 30px #FFD700';
+    setTimeout(startLimbo, 2500);
+}
+
+function showScreen(id) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
+</script>
+</body>
+</html>

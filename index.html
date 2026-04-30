@@ -1,0 +1,65 @@
+```html
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>GD Arcade Activity</title>
+<script src="https://discord.com/api/embedded-app-sdk/v1.js"></script>
+
+<style>
+body { margin:0; background:black; overflow:hidden; }
+#loading {
+  position:fixed;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:white;
+  font-family:monospace;
+}
+iframe {
+  border:none;
+  width:100vw;
+  height:100vh;
+}
+</style>
+</head>
+
+<body>
+
+<div id="loading">Starting GD Arcade...</div>
+<iframe id="game"></iframe>
+
+<script>
+const clientId = "1499092167975633047"
+const sdk = new window.DiscordSDK(clientId)
+
+async function start() {
+  await sdk.ready()
+
+  try {
+    await sdk.commands.authorize({
+      client_id: clientId,
+      response_type: "code",
+      scope: ["identify"]
+    })
+  } catch(e) {}
+
+  // Load your actual game file
+  fetch("gd arcade.html")
+  .then(res => res.text())
+  .then(html => {
+    document.getElementById("game").srcdoc = html
+    document.getElementById("loading").style.display = "none"
+  })
+  .catch(() => {
+    document.getElementById("loading").innerText = "Failed to load game"
+  })
+}
+
+start()
+</script>
+
+</body>
+</html>
+```
